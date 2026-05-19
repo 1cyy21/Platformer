@@ -22,15 +22,19 @@ let config = {
     physics: {
         default: 'arcade',
         arcade: {
-            debug: true,
+            debug: false,
             gravity: {
                 x: 0,
                 y: 0
             }
         }
     },
-    width: 1440,
+    width: 1350,
     height: 725,
+    scale: {
+        mode: Phaser.Scale.EXPAND,
+        autoCenter: Phaser.Scale.CENTER_BOTH
+    },
     scene: [Load, Platformer]
 }
 
