@@ -65,6 +65,7 @@ class Platformer extends Phaser.Scene {
             collides: true
         });
 
+
         this.fallingPlatforms.forEachTile(tile => {
             if (tile.properties.oneway === true){
                 tile.setCollision(false, false, true, false);
@@ -216,10 +217,34 @@ class Platformer extends Phaser.Scene {
 
         this.physics.add.collider(my.sprite.player, this.groundLayer);
         this.physics.add.collider(my.sprite.player, this.waterLayer, (obj1, obj2) => {
-            obj1.setPosition(this.spawnX, this.spawnY);
+            this.respawnPlayer(obj1);
         });
 
-        this.physics.add.collider(my.sprite.player, this.fallingPlatforms);
+        //falling platforms 
+        this.fallenPlatformTiles = [];
+        this.triggeredFallingTiles = new Set();
+
+        this.fallingPlatformSprites = this.physics.add.group({
+            allowGravity: false, 
+            immovable: true
+        });
+
+        this.physics.add.collider(my.sprite.player, this.fallingPlatformSprites);
+        this.physics.add.collider(my.sprite.player, this.fallingPlatforms, (player, tile) => {
+            if (player.body.velocity.y < 0){
+                return;
+            }
+
+            let tileKey = tile.x + "," + tile.y;
+
+            if(this.triggeredFallingTiles.has(tileKey)){
+                return;
+            }
+
+            this.triggeredFallingTiles.add(tileKey);
+
+            this.startFallingPlatforms(tile);
+        }, null, this);
 
         this.physics.add.collider(this.enemyGroup, this.enemyCollisionLayer);
         this.physics.add.collider(this.unkillableEnemyGroup, this.enemyCollisionLayer);
@@ -230,7 +255,7 @@ class Platformer extends Phaser.Scene {
         this.waterZone.body.moves = false;
 
         this.physics.add.overlap(my.sprite.player, this.waterZone, (obj1, obj2) => {
-            obj1.setPosition(this.spawnX, this.spawnY);
+            this.respawnPlayer(obj1);
         });
 
         // hazard collision detection
@@ -275,13 +300,13 @@ class Platformer extends Phaser.Scene {
                     }
                 });
             } else {
-                player.setPosition(this.spawnX, this.spawnY);
+                this.respawnPlayer(player);
                 player.body.setVelocity(0, 0);
             }
         }, null, this);
 
         this.physics.add.overlap(my.sprite.player, this.unkillableEnemyGroup, (player, enemy) => {
-            player.setPosition(this.spawnX, this.spawnY);
+            this.respawnPlayer(player)
             player.body.setVelocity(0, 0);
         }, null, this);
 
@@ -313,14 +338,14 @@ class Platformer extends Phaser.Scene {
                     }
                 });
             } else {
-                player.setPosition(this.spawnX, this.spawnY);
+                this.respawnPlayer(player);
                 player.body.setVelocity(0, 0);
             }
         }, null, this);
 
         this.physics.add.overlap(my.sprite.player, this.mineGroup, (player, mine) => {
             mine.destroy();
-            player.setPosition(this.spawnX, this.spawnY);
+            this.respawnPlayer(player);
             player.body.setVelocity(0, 0);
         }, null, this);
 
@@ -614,4 +639,112 @@ class Platformer extends Phaser.Scene {
 
         return Phaser.Geom.Rectangle.Overlaps(view, enemy.getBounds());
     };
+
+    startFallingPlatforms(tile){
+        let tileData = {
+            x: tile.x, 
+            y: tile.y, 
+            index: tile.index, 
+            properties: tile.properties
+        };
+
+        this.fallenPlatformTiles.push(tileData);
+
+        let frame = tile.index;
+
+        if (tile.tileset) {
+            frame = tile.index - tile.tileset.firstgid;
+        }
+
+        let platform = this.physics.add.sprite(
+            tile.getCenterX(),
+            tile.getCenterY(),
+            "tilemap_sheet",
+            frame
+        );
+
+        platform.setOrigin(0.5);
+        platform.body.setAllowGravity(false);
+        platform.body.setImmovable(true);
+        platform.body.setVelocity(0, 0);
+
+        this.fallingPlatformSprites.add(platform);
+
+
+        this.fallingPlatforms.removeTileAt(tile.x, tile.y);
+
+        if (this.uiCamera) {
+            this.uiCamera.ignore(platform);
+        }
+
+        let originalX = platform.x;
+        let originalY = platform.y;
+
+        this.tweens.add({
+            targets: platform,
+            x: {from: originalX - 4, to: originalX + 4},
+            duration: 40,
+            yoyo: true,
+            repeat: 5,
+            ease: "Linear",
+            onComplete: () => {
+                platform.x = originalX;
+                platform.y = originalY;
+
+                this.time.delayedCall(100, () => {
+                    if(!platform || !platform.active){
+                        return;
+                    }
+                        platform.body.setImmovable(false);
+                        platform.body.setAllowGravity(true);
+                        platform.body.setGravityY(-2200);
+                        platform.body.setVelocityY(20);
+                        platform.body.setMaxVelocityY(100);
+
+                        this.time.delayedCall(3000, () => {
+                            if (platform && platform.active) {
+                                platform.destroy();
+                            }
+                        });
+                });
+            }
+        });
+    }
+
+    resetFallingPlatforms() {
+        this.fallenPlatformTiles.forEach(tileData => {
+            let restoredTile = this.fallingPlatforms.putTileAt(
+                tileData.index,
+                tileData.x,
+                tileData.y
+            );
+
+            if (restoredTile) {
+                restoredTile.properties = tileData.properties;
+
+                if (restoredTile.properties.oneway === true) {
+                    restoredTile.setCollision(false, false, true, false);
+                } else {
+                    restoredTile.setCollision(true, true, true, true);
+                }
+            }
+        });
+
+        this.fallenPlatformTiles = [];
+        this.triggeredFallingTiles.clear();
+
+        this.fallingPlatformSprites.children.iterate(platform => {
+            if (platform) {
+                platform.destroy();
+            }
+        });
+    }
+
+    respawnPlayer(player){
+        this.resetFallingPlatforms();
+
+        player.setPosition(this.spawnX, this.spawnY);
+        player.body.setVelocity(0,0);
+        player.body.setAcceleration(0,0);
+    }
 }
