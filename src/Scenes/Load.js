@@ -4,7 +4,6 @@ class Load extends Phaser.Scene {
     }
 
     preload() {
-        this.load.scenePlugin('AnimatedTiles', './lib/AnimatedTiles.js', 'animatedTiles', 'animatedTiles');
         this.load.setPath("./assets/");
 
         // Load characters spritesheet
