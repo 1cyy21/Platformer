@@ -23,7 +23,7 @@ let config = {
         mode: Phaser.Scale.EXPAND,
         autoCenter: Phaser.Scale.CENTER_BOTH
     },
-    scene: [Load, Platformer]
+    scene: [Start, Load, Platformer]
 };
 
 var cursors;

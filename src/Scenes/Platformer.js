@@ -5,8 +5,10 @@ class Platformer extends Phaser.Scene {
 
     init() {
         // variables and settings
-        this.ACCELERATION = 250;
-        this.DRAG = 3000;    // DRAG < ACCELERATION = icy slide
+        this.ACCELERATION = 1000;
+        this.MAX_SPEED = 190;
+        this.DRAG = 1000;  
+        this.TURN_ACCELERATION = 3000;  
         this.physics.world.gravity.y = 2500;
         this.JUMP_VELOCITY = -650;
         this.SCALE = 2.5;
@@ -43,9 +45,6 @@ class Platformer extends Phaser.Scene {
         this.aesthetics = this.map.createLayer("aesthetics", [this.tileset, this.industrialTileset], 0, 0);
 
         this.enemyCollisionLayer = this.map.createLayer("Enemy-Collision", this.tileset, 0, 0);
-        
-        // console.log(this.animatedTiles);
-        // this.animatedTiles.init(this.map);
 
         this.waterLayer.setCollisionByProperty({
             hazard: true
@@ -136,10 +135,85 @@ class Platformer extends Phaser.Scene {
             key: "tilemap_characters",
             frame: 8
         });
-        console.log("unkillable:", this.unkillableEnemies.length);
-        console.log("flying:", this.flyingEnemies.length);
-        console.log("enemies:", this.enemies.length);
-        console.log("mines:", this.mines.length);
+
+        // vfx
+        my.vfx = {};
+        my.vfx.movement = this.add.particles(0, 0, "walk_vfx", {
+            scale: {start: 0.05, end: 0},
+            lifespan: 350,
+            gravityY: -this.PARTICLE_VELOCITY,
+            alpha: {start: 0.3, end: 0.1},
+        });
+
+        my.vfx.movement.stop();
+
+        my.vfx.doubleJump = this.add.particles(0, 0, "double_jump_vfx", {
+            scale: {start: 0.05, end: 0},
+            lifespan: 500,
+            alpha: {start: 0.3, end: 0.1}
+        });
+
+        my.vfx.doubleJump.stop();
+
+        my.vfx.enemyPoof = this.add.particles(0, 0, "enemy_poof", {
+            scale: {start: 0.05, end: 0},
+            lifespan: 500,
+            alpha: {start: 0.3, end: 0.1}
+        });
+
+        my.vfx.enemyPoof.stop();
+
+        my.vfx.explosion = this.add.particles(0, 0, "explosion_vfx", {
+            scale: {start: 0.1, end: 0},
+            lifespan: 1500,
+            alpha: {start: 0.3, end: 0.1} 
+        });
+
+        my.vfx.explosion.stop();
+
+        my.vfx.coinCollect = this.add.particles(0, 0, "coin_collect_vfx", {
+            scale: {start: 0.07, end: 0},
+            lifespan: 500, 
+            alpha: {start: 0.3, end: 0.1}
+        });
+
+        //sfx
+        this.player_hit_sfx = this.sound.add('player_hit_sfx', {
+            volume: 0.5,
+            loop: false
+        });
+
+        this.enemy_kill_sfx = this.sound.add('enemy_kill_sfx', {
+            volume: 0.5,
+            loop: false
+        });
+
+        this.coinPickup_sfx = this.sound.add('coinPickup_sfx', {
+            volume: 0.5,
+            loop: false
+        });
+
+        this.diamondPickup_sfx = this.sound.add('diamondPickup_sfx', {
+            volume: 0.5,
+            loop: false
+        });
+        
+        this.explosion_sfx = this.sound.add('explosion_sfx', {
+            volume: 0.5, 
+            loop: false
+        });
+        
+        this.jump_sfx = this.sound.add('jump_sfx', {
+            volume: 0.5, 
+            loop: false
+        });
+
+        this.checkpoint_sfx = this.sound.add('checkpoint_sfx', {
+            volume: 0.5,
+            loop: false
+        });
+
+
 
         this.physics.world.enable(this.coins, Phaser.Physics.Arcade.STATIC_BODY);
         this.physics.world.enable(this.diamonds, Phaser.Physics.Arcade.STATIC_BODY);
@@ -212,11 +286,14 @@ class Platformer extends Phaser.Scene {
         });
 
         my.sprite.player = this.physics.add.sprite(30, 200, "platformer_characters", "tile_0000.png");
+        my.sprite.player.setCollideWorldBounds(true);
+        my.sprite.player.body.setMaxVelocityX(this.MAX_SPEED);
         this.spawnX = my.sprite.player.x;
         this.spawnY = my.sprite.player.y;
 
         this.physics.add.collider(my.sprite.player, this.groundLayer);
         this.physics.add.collider(my.sprite.player, this.waterLayer, (obj1, obj2) => {
+            this.player_hit_sfx.play();
             this.respawnPlayer(obj1);
         });
 
@@ -249,24 +326,17 @@ class Platformer extends Phaser.Scene {
         this.physics.add.collider(this.enemyGroup, this.enemyCollisionLayer);
         this.physics.add.collider(this.unkillableEnemyGroup, this.enemyCollisionLayer);
 
-        this.waterZone = this.add.zone(this.map.widthInPixels / 2, this.map.heightInPixels - 18, this.map.widthInPixels, 80);
-        this.physics.world.enable(this.waterZone);
-        this.waterZone.body.setAllowGravity(false);
-        this.waterZone.body.moves = false;
-
-        this.physics.add.overlap(my.sprite.player, this.waterZone, (obj1, obj2) => {
-            this.respawnPlayer(obj1);
-        });
-
-        // hazard collision detection
         this.physics.add.overlap(my.sprite.player, this.coinGroup, (obj1, obj2) => {
             obj2.destroy();
+            my.vfx.coinCollect.explode(10, obj2.x, obj2.y);
+            this.coinPickup_sfx.play();
             this.score += 25;
             this.scoreText.setText(String(this.score).padStart(4, "0"));
         });
         
         this.physics.add.overlap(my.sprite.player, this.diamondGroup, (obj1, obj2) => {
             obj2.destroy();
+            this.diamondPickup_sfx.play();
             this.diamondsLeft -= 1;
             this.diamondText.setText(String(this.diamondsLeft));
         });
@@ -275,6 +345,8 @@ class Platformer extends Phaser.Scene {
         this.physics.add.overlap(my.sprite.player, this.enemyGroup, (player, enemy) => {
             if(player.body.velocity.y > 0 && player.y < enemy.y){
                 enemy.destroy();
+                my.vfx.enemyPoof.explode(10, enemy.x, enemy.y);
+                this.enemy_kill_sfx.play();
                 player.body.setVelocityY(this.JUMP_VELOCITY / 1.5);
                 let enemyScoreText = this.add.text(enemy.x, enemy.y, "+100", { fontSize: '8px', color: '#ffffff', stroke: '#000000', strokeThickness: 4}).setDepth(10);
 
@@ -301,11 +373,13 @@ class Platformer extends Phaser.Scene {
                 });
             } else {
                 this.respawnPlayer(player);
+                this.player_hit_sfx.play();
                 player.body.setVelocity(0, 0);
             }
         }, null, this);
 
         this.physics.add.overlap(my.sprite.player, this.unkillableEnemyGroup, (player, enemy) => {
+            this.player_hit_sfx.play();
             this.respawnPlayer(player)
             player.body.setVelocity(0, 0);
         }, null, this);
@@ -313,6 +387,8 @@ class Platformer extends Phaser.Scene {
         this.physics.add.overlap(my.sprite.player, this.flyingEnemyGroup, (player, enemy) => {
             if(player.body.velocity.y > 0 && player.y < enemy.y){
                 enemy.destroy();
+                my.vfx.enemyPoof.explode(10, enemy.x, enemy.y);
+                this.enemy_kill_sfx.play();
                 player.body.setVelocityY(this.JUMP_VELOCITY / 1.5);
                 let enemyScoreText = this.add.text(enemy.x, enemy.y, "+150", { fontSize: '8px', color: '#ffffff', stroke: '#000000', strokeThickness: 4}).setDepth(10);
 
@@ -339,12 +415,15 @@ class Platformer extends Phaser.Scene {
                 });
             } else {
                 this.respawnPlayer(player);
+                this.player_hit_sfx.play();
                 player.body.setVelocity(0, 0);
             }
         }, null, this);
 
         this.physics.add.overlap(my.sprite.player, this.mineGroup, (player, mine) => {
             mine.destroy();
+            my.vfx.explosion.explode(10, mine.x, mine.y);
+            this.explosion_sfx.play();
             this.respawnPlayer(player);
             player.body.setVelocity(0, 0);
         }, null, this);
@@ -358,6 +437,8 @@ class Platformer extends Phaser.Scene {
             checkpoint.activated = true; 
             this.spawnX = checkpoint.x;
             this.spawnY = checkpoint.y;
+
+            this.checkpoint_sfx.play();
 
             let checkpointText = this.add.text(checkpoint.x - 70, checkpoint.y - 30, "Checkpoint reached!", { fontSize: '12px', color: '#ffffff', stroke: '#000000', strokeThickness: 4}).setDepth(10);
 
@@ -392,6 +473,7 @@ class Platformer extends Phaser.Scene {
                 this.showRemainingDiamondsText(endFlag);
                 return;
             }
+            this.checkpoint_sfx.play();
             this.startlevelEnd(player);
         }, null, this);
 
@@ -403,6 +485,7 @@ class Platformer extends Phaser.Scene {
                 this.showRemainingDiamondsText(endFlag);
                 return;
             }
+            this.checkpoint_sfx.play();
             this.startlevelEnd(player);
         }, null, this);
 
@@ -423,6 +506,7 @@ class Platformer extends Phaser.Scene {
             this.waterLayer, 
             this.fallingPlatforms, 
             this.aesthetics, 
+
             this.coinGroup, 
             this.diamondGroup, 
             this.checkpointFlagGroup, 
@@ -435,6 +519,12 @@ class Platformer extends Phaser.Scene {
             this.enemyGroup,
             this.mineGroup,
             this.enemyCollisionLayer,
+
+            my.vfx.movement,
+            my.vfx.doubleJump,
+            my.vfx.explosion,
+            my.vfx.coinCollect,
+            my.vfx.enemyPoof,
 
             my.sprite.player]);
 
@@ -461,37 +551,59 @@ class Platformer extends Phaser.Scene {
             return;
         }
         if(cursors.left.isDown) {
+            // let accel = my.sprite.player.body.velocity.x > 0 ? this.TURN_ACCELERATION : this.ACCELERATION;
             // TODO: have the player accelerate to the left
             my.sprite.player.body.setAccelerationX(-this.ACCELERATION);
-            my.sprite.player.body.setDragX(this.DRAG);
+            my.sprite.player.body.setDragX(-this.DRAG);
             my.sprite.player.resetFlip();
             my.sprite.player.anims.play('walk', true);
+            my.vfx.movement.startFollow(my.sprite.player, -my.sprite.player.displayWidth / 2 + 20, my.sprite.player.displayHeight / 2, false);
+            my.vfx.movement.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
+            if(my.sprite.player.body.blocked.down){
+                my.vfx.movement.start();
+                this.jumpsRemaining = 1;
+            }
 
         } else if(cursors.right.isDown) {
+            // let accel = my.sprite.player.body.velocity.x > 0 ? this.TURN_ACCELERATION : this.ACCELERATION;
+
             my.sprite.player.body.setAccelerationX(this.ACCELERATION);
             my.sprite.player.body.setDragX(this.DRAG);
             my.sprite.player.setFlip(true, false);
             my.sprite.player.anims.play('walk', true);
+            my.vfx.movement.startFollow(my.sprite.player, my.sprite.player.displayWidth / 2 - 20, my.sprite.player.displayHeight / 2, false);
+            my.vfx.movement.setParticleSpeed(this.PARTICLE_VELOCITY, 0);
+            if(my.sprite.player.body.blocked.down){
+                my.vfx.movement.start();
+                this.jumpsRemaining = 1;
+            }
 
         } else {
             my.sprite.player.body.setAccelerationX(0);
             my.sprite.player.body.setDragX(this.DRAG);
             my.sprite.player.anims.play('idle'); 
+            my.vfx.movement.stop();
         }
 
         if(my.sprite.player.body.blocked.down){
             this.jumpsRemaining = 1;
-        }
-        if(!my.sprite.player.body.blocked.down) {
+        } else {
             my.sprite.player.anims.play('jump');
+            my.vfx.movement.stop();
         }   
         if(this.jumpsRemaining > 0 && Phaser.Input.Keyboard.JustDown(cursors.up)) {
             my.sprite.player.body.setVelocityY(this.JUMP_VELOCITY);
             this.jumpsRemaining--;
-        }
+            this.jump_sfx.play();
+
+            if(!my.sprite.player.body.blocked.down){
+                my.vfx.movement.stop();
+                my.vfx.doubleJump.explode(10, my.sprite.player.x, my.sprite.player.y + my.sprite.player.displayHeight / 2);
+            }
+           
+        } 
 
         // enemy edge detection
-               // enemy edge detection
         this.enemyGroup.children.iterate(enemy => {
             if(!enemy || !enemy.body){
                 return;
@@ -574,6 +686,7 @@ class Platformer extends Phaser.Scene {
         this.levelEnd = true;
 
         this.cameras.main.stopFollow();
+        player.setCollideWorldBounds(false);
 
         player.body.setDragX(0);
         player.setVelocityX(120);
@@ -612,7 +725,7 @@ class Platformer extends Phaser.Scene {
         });
 
         menuButton.on('pointerdown', () => {
-            this.scene.start("menuScene");
+            this.scene.start("startScene");
         });
 
         let endUI = [panel, completeText, finalScoreText, restartButton, menuButton];
@@ -742,7 +855,8 @@ class Platformer extends Phaser.Scene {
 
     respawnPlayer(player){
         this.resetFallingPlatforms();
-
+        player.body.setVelocity(0,0);
+        player.body.setAcceleration(0,0);
         player.setPosition(this.spawnX, this.spawnY);
         player.body.setVelocity(0,0);
         player.body.setAcceleration(0,0);

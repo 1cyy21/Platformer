@@ -16,6 +16,20 @@ class Load extends Phaser.Scene {
         this.load.image("background_tiles", "tilemap-backgrounds_packed.png");
         this.load.tilemapTiledJSON("stage-1", "stage-1.tmj");   // Tilemap in JSON
 
+        this.load.image("walk_vfx", "smoke_03.png");
+        this.load.image("double_jump_vfx", "smoke_10.png");
+        this.load.image("enemy_poof", "smoke_06.png");
+        this.load.image("explosion_vfx", "explosion08.png");
+        this.load.image("coin_collect_vfx", "star_09.png");
+
+        this.load.audio("coinPickup_sfx", "coinPickup.wav");
+        this.load.audio("diamondPickup_sfx", "diamondPickup.wav");
+        this.load.audio("enemy_kill_sfx", "enemy_kill.wav");
+        this.load.audio("explosion_sfx", "explosion.wav");
+        this.load.audio("jump_sfx", "Jump.wav");
+        this.load.audio("player_hit_sfx", "player_hit.wav");
+        this.load.audio("checkpoint_sfx", "checkpoint.wav");
+
         this.load.spritesheet("tilemap_sheet", "tilemap_packed.png", { 
             frameWidth: 18,
             frameHeight: 18 
@@ -111,7 +125,8 @@ class Load extends Phaser.Scene {
             }),
             frameRate: 5,
             repeat: -1
-        })
+        });
+
 
 
          // ...and pass to the next Scene
