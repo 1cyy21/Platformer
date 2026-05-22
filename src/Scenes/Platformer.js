@@ -530,6 +530,8 @@ class Platformer extends Phaser.Scene {
 
             my.sprite.player]);
 
+        this.physics.wrold.drawDebug = false;
+
         // set up Phaser-provided cursor key input
         cursors = this.input.keyboard.createCursorKeys();
 
