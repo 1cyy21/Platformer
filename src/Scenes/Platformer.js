@@ -526,6 +526,8 @@ class Platformer extends Phaser.Scene {
             my.vfx.coinCollect,
             my.vfx.enemyPoof,
 
+            this.physics.world.debugGraphic,
+
             my.sprite.player]);
 
         // set up Phaser-provided cursor key input
