@@ -28,7 +28,6 @@ class Platformer extends Phaser.Scene {
 
         this.physics.world.setBounds(0, 0, this.map.widthInPixels, this.map.heightInPixels + 100);
         this.physics.world.checkCollision.up = false;
-        this.physics.world.TILE_BIAS = 32;
         
         this.tileset = this.map.addTilesetImage("kenny_tilemap_packed", "tilemap_tiles");
         this.bgTileset = this.map.addTilesetImage("tilemap-backgrounds_packed", "background_tiles");
@@ -212,8 +211,6 @@ class Platformer extends Phaser.Scene {
             volume: 0.5,
             loop: false
         });
-
-
 
         this.physics.world.enable(this.coins, Phaser.Physics.Arcade.STATIC_BODY);
         this.physics.world.enable(this.diamonds, Phaser.Physics.Arcade.STATIC_BODY);
